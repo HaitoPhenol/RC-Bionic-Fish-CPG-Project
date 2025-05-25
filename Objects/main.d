@@ -32,3 +32,4 @@
 .\objects\main.o: .\Hardware\LED.h
 .\objects\main.o: .\Hardware\Key.h
 .\objects\main.o: .\Hardware\Servo.h
+.\objects\main.o: E:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h

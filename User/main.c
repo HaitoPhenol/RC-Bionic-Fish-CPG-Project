@@ -3,6 +3,9 @@
 #include "LED.h"
 #include "Key.h"
 #include "Servo.h"
+#include <math.h>
+
+#define PI 3.1415926f
 
 int main(void)
 {
@@ -10,17 +13,27 @@ int main(void)
 	Key_Init();
 	Servo_Init();
 
-	float angle = 0; // 当前角度
-
 	while (1)
 	{
 		if (Key_GetNum() == 1)
 		{
 			LED_ON();
-			angle += 30;
-			if (angle > 180) angle = 0; // 超过180度回到0
-			Servo_SetAngle(angle);
-			Delay_ms(500);
+			for (int swing = 0; swing < 3; swing++)
+			{
+				// 幅度范围调整为40~160度，整体减小5度
+				for (int t = 0; t <= 100; t++)
+				{
+					float theta = 40 + 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
+					Servo_SetAngle(theta);
+					Delay_ms(12);
+				}
+				for (int t = 0; t <= 100; t++)
+				{
+					float theta = 160 - 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
+					Servo_SetAngle(theta);
+					Delay_ms(12);
+				}
+			}
 			LED_OFF();
 		}
 	}
