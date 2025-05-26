@@ -20,20 +20,21 @@ int main(void)
 			LED_ON();
 			for (int swing = 0; swing < 3; swing++)
 			{
-				// 幅度范围为40~160度
+				// 幅度范围为70~130度，这角度这么奇怪我也不知道什么意思啊
 				for (int t = 0; t <= 100; t++)
 				{
-					float theta = 40 + 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
+					float theta = 70 + 60 * 0.5f * (1 - cosf(t * PI / 100.0f));
 					Servo_SetAngle(theta);
 					Delay_ms(12);  //  不能再小了，否则会转不到位
 				}
-				Delay_ms(20);  //  等待执行到位
+				Delay_ms(10);  //  等待执行到位
 				for (int t = 0; t <= 100; t++)
 				{
-					float theta = 160 - 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
+					float theta = 130 - 60 * 0.5f * (1 - cosf(t * PI / 100.0f));
 					Servo_SetAngle(theta);
 					Delay_ms(12);
 				}
+				Delay_ms(10);  //  等待执行到位
 			}
 			LED_OFF();
 		}
