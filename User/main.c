@@ -20,13 +20,14 @@ int main(void)
 			LED_ON();
 			for (int swing = 0; swing < 3; swing++)
 			{
-				// 幅度范围调整为40~160度，整体减小5度
+				// 幅度范围为40~160度
 				for (int t = 0; t <= 100; t++)
 				{
 					float theta = 40 + 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
 					Servo_SetAngle(theta);
-					Delay_ms(12);
+					Delay_ms(12);  //  不能再小了，否则会转不到位
 				}
+				Delay_ms(20);  //  等待执行到位
 				for (int t = 0; t <= 100; t++)
 				{
 					float theta = 160 - 120 * 0.5f * (1 - cosf(t * PI / 100.0f));
