@@ -31,6 +31,7 @@
 ".\objects\oled.o"
 ".\objects\pwm.o"
 ".\objects\servo.o"
+".\objects\cpg_control.o"
 ".\objects\main.o"
 ".\objects\stm32f10x_it.o"
 --strict --scatter ".\Objects\Project.sct"

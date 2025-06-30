@@ -14,7 +14,7 @@ void PWM_Init(void)
 	/*GPIO初始化*/
 	GPIO_InitTypeDef GPIO_InitStructure;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3;	// PA1/2/3/3
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);							//将PA1引脚初始化为复用推挽输出	
 																	//受外设控制的引脚，均需要配置为复用模式
@@ -40,11 +40,26 @@ void PWM_Init(void)
 	TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;       //输出极性，选择为高，若选择极性为低，则输出高低电平取反
 	TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;   //输出使能
 	TIM_OCInitStructure.TIM_Pulse = 0;								//初始的CCR值
-	TIM_OC2Init(TIM2, &TIM_OCInitStructure);                        //将结构体变量交给TIM_OC2Init，配置TIM2的输出比较通道2
-	
+	TIM_OC2Init(TIM2, &TIM_OCInitStructure);                        // CH2: PA1
+	TIM_OC3Init(TIM2, &TIM_OCInitStructure);                        // CH3: PA2
+	TIM_OC4Init(TIM2, &TIM_OCInitStructure);                        // CH4: PA3
+
+
 	/*TIM使能*/
 	TIM_Cmd(TIM2, ENABLE);			//使能TIM2，定时器开始运行
 }
+
+// /**
+//   * 函    数：PWM设置CCR
+//   * 参    数：Compare 要写入的CCR的值，范围：0~100
+//   * 返 回 值：无
+//   * 注意事项：CCR和ARR共同决定占空比，此函数仅设置CCR的值，并不直接是占空比
+//   *           占空比Duty = CCR / (ARR + 1)
+//   */
+// void PWM_SetCompare2(uint16_t Compare)
+// {
+// 	TIM_SetCompare2(TIM2, Compare);		//设置CCR2的值
+// }
 
 /**
   * 函    数：PWM设置CCR
@@ -53,7 +68,20 @@ void PWM_Init(void)
   * 注意事项：CCR和ARR共同决定占空比，此函数仅设置CCR的值，并不直接是占空比
   *           占空比Duty = CCR / (ARR + 1)
   */
-void PWM_SetCompare2(uint16_t Compare)
+void PWM_SetCompare(uint8_t channel, uint16_t Compare)
 {
-	TIM_SetCompare2(TIM2, Compare);		//设置CCR2的值
+    switch(channel)
+    {
+        case 1:
+            TIM_SetCompare2(TIM2, Compare);
+            break;
+        case 2:
+            TIM_SetCompare3(TIM2, Compare);
+            break;
+        case 3:
+            TIM_SetCompare4(TIM2, Compare);
+            break;
+        default:
+            break;
+    }
 }
