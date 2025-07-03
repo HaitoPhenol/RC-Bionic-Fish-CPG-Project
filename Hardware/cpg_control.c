@@ -6,117 +6,148 @@ x和y代表振荡器的状态变量; ω代表振荡器的频率; r、A代表振�
 k为Hopf振荡器的收敛因子; 耦合项p(t)与q(t); 
 */
 
-//时间值
-double t1 = 5.0, t2 = 10.0, t3 = 15.0, t4 = 20.0, t5 = 25.0, t6 = 30.0, t7 = 35.0;
-
 //static：限定变量只在本文件（.c 文件）内可见，外部无法访问，防止命名冲突。
 //const：常量，初始化后不能修改。
-
 static const double M_PI = 3.14159265358979323846;
-static const double k = 15.0;   // 在Hopf振荡器中加入收敛因子k，k值越大，振荡器的收敛速度越快，是过渡较为剧烈，k值越小，振荡器的收敛速度越慢，但是过渡过程越平滑．
-static const double s = 0.5;    // 占空比
-static const double j1 = 0.5;   // 左侧鳍
-static const double j2 = 0.5;   // 右侧鳍 
-static const double j3 = 0.0;   // 尾鳍
-static const double u = 100.0;  
-static const double a = 100.0;  // 较大的常数
-static const double w_sw = 3.14159265358979323846;  // 摆动相频率
 
-// 初始状态,取较小的随机数 
-void CPG_Init(CPG_State *state) {
+// 初始化CPG状态
+void initCPGState(CPGState *state) {
     state->t = 0.0;
-    for(int i = 0; i < 6; i++) {
-        state->x[i] = 0.5 * (rand() / (double)RAND_MAX);
+    for (int i = 0; i < 3; i++) {
+        state->x[i] = 0.1;
+        state->y[i] = 0.1;
+        state->omega[i] = 1.5 * M_PI;
+        state->amplitude[i] = (i == 0) ? 3.0 : (i == 1) ? 3.5 : 4.0;
+        state->bias[i] = 0.0;
     }
+    state->k = 0.8;
+    // 耦合权重初始化
+    state->coupling[0][0] = 0.0; state->coupling[0][1] = 0.2;
+    state->coupling[1][0] = 1.0; state->coupling[1][1] = 0.2;
+    state->coupling[2][0] = 1.0; state->coupling[2][1] = 0.0;
+    // 相位差初始化
+    state->phase[0] = 0.25 * M_PI;
+    state->phase[1] = 0.25 * M_PI;
 }
 
-// 定义游动步态的分段函数
-static void get_b_values(double t, double *b1, double *b2) {
-    if(t <= t1) {
-        *b1 = 0; *b2 = 0;    // 直游
-    } else if(t > t1 && t <= t2) {
-        *b1 = 5; *b2 = 0;    // 下潜
-    } else if(t > t2 && t <= t3) {
-        *b1 = 0; *b2 = 0;    // 直游
-    } else if(t > t3 && t <= t4) {
-        *b1 = 0; *b2 = 5;    // 转向
-    } else if(t > t4 && t <= t5) {
-        *b1 = 0; *b2 = 0;    // 直游
-    } else if(t > t5 && t <= t6) {
-        *b1 = -5; *b2 = 0;   // 上浮
-    } else if(t > t6 && t <= t7) {
-        *b1 = 0; *b2 = 0;    // 直游
+// 设置相位方向（正向或反向）
+void set_phase_direction(CPGState *state, int reverse) {
+    if (reverse) {
+        state->phase[0] = -0.25 * M_PI;
+        state->phase[1] = -0.25 * M_PI;
     } else {
-        *b1 = 0; *b2 = 0;
+        state->phase[0] = 0.25 * M_PI;
+        state->phase[1] = 0.25 * M_PI;
     }
 }
 
-// 爬行CPG（2-12）和游动CPG（14-16）单元的频率
-static double calculate_w(double x) {
-    double w_st = w_sw * (1 - s) / s;   // 支撑相频率
-    return w_st / (1 + exp(-a * x)) + w_sw / (1 + exp(a * x));
-}
-
-// ODE45解微分方程
-static void cpg_ode(double t, const double x[6], double dx[6]) {
-    double b1, b2;
-    get_b_values(t, &b1, &b2);
-    double w[3] = {
-        calculate_w(x[1]),
-        calculate_w(x[3]),
-        calculate_w(x[5])
-    };
-    
-    // r 代表振荡器的幅值，采用这种非线性函数的振荡器称为Hopf振荡器
-    // r 是所有CPG单元之间的相位差矩阵，3*3矩阵，r(1,2)：表示CPG1与CPG2之间的相位差，r(1,2)=j1-j2
-    double r[3][3] = {
-        {2*M_PI*(j1-j1), 2*M_PI*(j1-j2), 2*M_PI*(j1-j3)},
-        {2*M_PI*(j2-j1), 2*M_PI*(j2-j2), 2*M_PI*(j2-j3)},
-        {2*M_PI*(j3-j1), 2*M_PI*(j3-j2), 2*M_PI*(j3-j3)}
-    };
-    
-    // 计算耦合项p(t)与q(t)
-    double p1 = cos(r[0][1])*x[2] - sin(r[0][1])*(x[3]-b1) + cos(r[0][2])*x[4] - sin(r[0][2])*(x[5]-b2);
-    double q1 = sin(r[0][1])*x[2] + cos(r[0][1])*(x[3]-b1) + sin(r[0][2])*x[4] + cos(r[0][2])*(x[5]-b2);
-    
-    double p2 = cos(r[1][0])*x[0] - sin(r[1][0])*(x[1]-b1) + cos(r[1][2])*x[4] - sin(r[1][2])*(x[5]-b2);
-    double q2 = sin(r[1][0])*x[0] + cos(r[1][0])*(x[1]-b1) + sin(r[1][2])*x[4] + cos(r[1][2])*(x[5]-b2);
-    
-    double p3 = cos(r[2][0])*x[0] - sin(r[2][0])*(x[1]-b1) + cos(r[2][1])*x[2] - sin(r[2][1])*(x[3]-b1);
-    double q3 = sin(r[2][0])*x[0] + cos(r[2][0])*(x[1]-b1) + sin(r[2][1])*x[2] + cos(r[2][1])*(x[3]-b1);
-    
-    // 爬行CPG1
-    dx[0] = k*(u - (sqrt(x[0]*x[0] + (x[1]-b1)*(x[1]-b1)))*(sqrt(x[0]*x[0] + (x[1]-b1)*(x[1]-b1))))*x[0] - w[0]*(x[1]-b1) + p1;
-    dx[1] = k*(u - (sqrt(x[0]*x[0] + (x[1]-b1)*(x[1]-b1)))*(sqrt(x[0]*x[0] + (x[1]-b1)*(x[1]-b1))))*(x[1]-b1) + w[0]*x[0] + q1;
-    
-    // 爬行CPG2
-    dx[2] = k*(u - (sqrt(x[2]*x[2] + (x[3]-b1)*(x[3]-b1)))*(sqrt(x[2]*x[2] + (x[3]-b1)*(x[3]-b1))))*x[2] - w[1]*(x[3]-b1) + p2;
-    dx[3] = k*(u - (sqrt(x[2]*x[2] + (x[3]-b1)*(x[3]-b1)))*(sqrt(x[2]*x[2] + (x[3]-b1)*(x[3]-b1))))*(x[3]-b1) + w[1]*x[2] + q2;
-    
-    // 爬行CPG3
-    dx[4] = k*(u - (sqrt(x[4]*x[4] + (x[5]-b2)*(x[5]-b2)))*(sqrt(x[4]*x[4] + (x[5]-b2)*(x[5]-b2))))*x[4] - w[2]*(x[5]-b2) + p3;
-    dx[5] = k*(u - (sqrt(x[4]*x[4] + (x[5]-b2)*(x[5]-b2)))*(sqrt(x[4]*x[4] + (x[5]-b2)*(x[5]-b2))))*(x[5]-b2) + w[2]*x[4] + q3;
-}
-
-/*当你有一个结构体指针（比如 CPG_State *state），想访问它的成员（比如 t 或 x），就用 ->。
-比如：state->t  等价于：(*state).t
-意思是“取 state 指针指向的结构体里的 t 成员”。
-如果你有结构体变量（不是指针），则用点号 .，比如 state.t。*/
-
-// CPG状态更新，使用欧拉法积分
-void CPG_Update(CPG_State *state, double dt) {
-    double dx[6]; // 存储微分方程的结果
-    cpg_ode(state->t, state->x, dx); // 计算当前状态的导数
-    
-    for(int i = 0; i < 6; i++) {
-        state->x[i] += dx[i] * dt; // 用欧拉法更新状态变量
+// 获取不同时间段的偏置量，并切换相位方向
+void get_bias_values(double t, double *bias, CPGState *state) {
+    if (t <= 10) {
+        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 直游（无偏置）
+        set_phase_direction(state, 0); // 正向
+    } else if (t <= 20) {
+        bias[0] = 3.0; bias[1] = 3.0; bias[2] = 3.0; // 转弯（加3单位偏置）
+        set_phase_direction(state, 0); // 正向
+    } else if (t <= 30) {
+        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 直游
+        set_phase_direction(state, 0); // 正向
+    } else if (t <= 40) {
+        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 倒游
+        set_phase_direction(state, 1); // 反向
+    } else {
+        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 复位
+        set_phase_direction(state, 0); // 正向
     }
-    state->t += dt; // 更新时间
 }
 
-// CPG输出接口，将状态变量映射为左鳍、右鳍、尾鳍的输出
-void CPG_GetOutput(const CPG_State *state, double *left_fin, double *right_fin, double *tail) {
-    *left_fin = state->x[1];   // 左鳍输出
-    *right_fin = state->x[3];  // 右鳍输出
-    *tail = state->x[5];       // 尾鳍输出
+// 计算CPG微分方程
+void cpg_ode(CPGState *state, double *dx, double *dy) {
+    double bias[3];
+    get_bias_values(state->t, bias, state);
+
+    double phase[2];
+    phase[0] = state->phase[0];
+    phase[1] = state->phase[1];
+
+    for (int i = 0; i < 3; i++) {
+        double x = state->x[i];
+        double y = state->y[i];
+        double omega = state->omega[i];
+        double A = state->amplitude[i];
+        double b = bias[i];
+        double k = state->k;
+
+        // Hopf振荡器的非线性项
+        double nonlinear = A * A - x * x - (y - b) * (y - b);
+
+        double p = 0.0;
+        double q = 0.0;
+
+        // 计算耦合项
+        if (i == 0) {
+            // 第一个振荡器只与下一个耦合
+            if (i + 1 < 3) {
+                double h = state->coupling[i][1];
+                double phi = phase[0];
+                double x_next = state->x[i + 1];
+                double y_next = state->y[i + 1];
+                double b_next = bias[i + 1];
+                q = h * (x_next * sin(phi) + (y_next - b_next) * cos(phi));
+            }
+        } else if (i == 2) {
+            // 最后一个振荡器只与前一个耦合
+            if (i - 1 >= 0) {
+                double h = state->coupling[i][0];
+                double phi = phase[1];
+                double x_prev = state->x[i - 1];
+                double y_prev = state->y[i - 1];
+                double b_prev = bias[i - 1];
+                p = h * (x_prev * cos(phi) + (y_prev - b_prev) * sin(phi));
+            }
+        } else {
+            // 中间振荡器与前后都耦合
+            double h_prev = state->coupling[i][0];
+            double phi_prev = phase[0];
+            double x_prev = state->x[i - 1];
+            double y_prev = state->y[i - 1];
+            double b_prev = bias[i - 1];
+            p = h_prev * (x_prev * cos(phi_prev) + (y_prev - b_prev) * sin(phi_prev));
+
+            double h_next = state->coupling[i][1];
+            double phi_next = phase[1];
+            double x_next = state->x[i + 1];
+            double y_next = state->y[i + 1];
+            double b_next = bias[i + 1];
+            q = h_next * (x_next * sin(phi_next) + (y_next - b_next) * cos(phi_next));
+        }
+
+        // Hopf振荡器微分方程
+        dx[i] = -omega * (y - b) + k * x * nonlinear + p;
+        dy[i] = omega * x + k * (y - b) * nonlinear + q;
+    }
+}
+
+// 欧拉法更新CPG状态
+void cpg_update(CPGState *state, double dt) {
+    double dx[3];
+    double dy[3];
+    cpg_ode(state, dx, dy);
+
+    // 状态变量按欧拉法积分
+    for (int i = 0; i < 3; i++) {
+        state->x[i] += dx[i] * dt;
+        state->y[i] += dy[i] * dt;
+    }
+    state->t += dt;
+}
+
+// 将CPG输出映射为舵机角度（80~120范围）
+double map_to_servo(double y_value) {
+    // 1. 限制CPG输出范围（论文式3-89：y∈[-9,9]）
+    double y_clamped = (y_value < -9.0)? -9.0 : (y_value > 9.0)? 9.0 : y_value;
+    // 2. 放大5倍（论文λ=10）→ [-90,90]
+    double angle_raw = y_clamped * 5;
+    // 3. 偏移到80~120（中间值100）
+    return 100 + angle_raw;
 }
