@@ -69,6 +69,14 @@ void cpg_update(CPGState *state, double dt);
  */
 double map_to_servo(double y_value);
 
+/**
+ * @brief 动态设置CPG振荡器频率
+ * @param state [输入/输出] 指向CPGState结构体的指针
+ * @param freq [输入] 新的频率（单位：Hz）
+ * @details 所有振荡器频率统一设置为 freq
+ */
+void set_cpg_frequency(CPGState *state, double freq);
+
 // 新增：全局动作模式变量声明
 extern uint8_t g_motion_mode;
 

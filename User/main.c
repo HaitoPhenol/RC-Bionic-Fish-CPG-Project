@@ -11,6 +11,7 @@
 // #include <stdlib.h>     // 标准库函数，如 malloc、free、rand 等（当前未使用）
 
 uint8_t KeyNum = 0;          // 定义用于接收按键码的变量
+double cpg_freq = 2.5;       // 当前CPG频率（Hz），初始值2.5
 
 int main() {
     // 初始化硬件
@@ -25,24 +26,34 @@ int main() {
     // 初始状态g_motion_mode=5，鱼尾伸直
     while (1) {
         KeyNum = Key_GetNum(); // 获取按键键码
+        // 处理加速/减速键
+        if (KeyNum == 6) { // B13加速
+            cpg_freq += 0.1;
+            if (cpg_freq > 5.0) cpg_freq = 5.0;
+        } else if (KeyNum == 7) { // B14减速
+            cpg_freq -= 0.1;
+            if (cpg_freq < 1.0) cpg_freq = 1.0;
+        }
+        set_cpg_frequency(&state, cpg_freq); // 每次循环都设置频率
+
         // 按钮控制运动状态
-        // 1 - 按键1（PB1） 右转动作
-        // 2 - 按键2（PB10） 前进动作
-        // 3 - 按键3（PB11） 左转动作
-        // 4 - 按键4（PB0） 后退动作
-        // 5 - 按键5（PB12） 停止并回到初始位置
+        // 1 - 按键1（PB1）     右转动作
+        // 2 - 按键2（PB10）    前进动作
+        // 3 - 按键3（PB11）    左转动作
+        // 4 - 按键4（PB0）     后退动作
+        // 5 - 按键5（PB12）    停止并回到初始位置
         if (KeyNum == 1) {
-			OLED_ShowString(1, 1, "Right  ");
+			OLED_ShowString(1, 1, "Right  "); // 1
         } else if (KeyNum == 2) {
-            OLED_ShowString(1, 1, "Forward");
+            OLED_ShowString(1, 1, "Forward"); // 2
         } else if (KeyNum == 3) {
-            OLED_ShowString(1, 1, "Left   ");
+            OLED_ShowString(1, 1, "Left   "); // 3
         } else if (KeyNum == 4) {
-            OLED_ShowString(1, 1, "Back   "); // 倒游
+            OLED_ShowString(1, 1, "Back   "); // 4 倒游
         } else if (KeyNum == 5) {
-            OLED_ShowString(1, 1, "Reset  ");
-        }  
-      
+            OLED_ShowString(1, 1, "Reset  "); // 5 停止并回到初始位置
+        }
+
         // 更新舵机角度数据
         cpg_update(&state, dt);
         double servo_angles[3];
@@ -50,10 +61,13 @@ int main() {
             servo_angles[i] = map_to_servo(state.y[i]);
         }
 
+        // 显示当前速度（频率），在第一行右侧
+        char freq_str[10];
+        sprintf(freq_str, "V:%.1f", cpg_freq);
+        OLED_ShowString(1, 12, freq_str);
         // 显示舵机角度（取整显示），并设置舵机角度
         double bias[3];
         get_bias_values(KeyNum, bias, &state); // bias由g_motion_mode决定
-
         for (int i = 2; i < 5; i++) {
             char servo_label[5];
             sprintf(servo_label, "S%d:", i - 1);

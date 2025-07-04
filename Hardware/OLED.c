@@ -264,6 +264,27 @@ void OLED_ShowBinNum(uint8_t Line, uint8_t Column, uint32_t Number, uint8_t Leng
 }
 
 /**
+  * @brief  OLED显示速度（在第一行右侧，格式：S:xx.x）
+  * @param  speed 当前速度（频率，单位Hz）
+  * @retval 无
+  */
+void OLED_ShowSpeed(float speed)
+{
+    char buf[8];
+    // 格式化为" S:xx.x"
+    int s = (int)(speed * 10 + 0.5f);
+    buf[0] = ' ';
+    buf[1] = 'S';
+    buf[2] = ':';
+    buf[3] = (s / 100) ? (s / 100 + '0') : ' ';
+    buf[4] = ((s / 10) % 10) + '0';
+    buf[5] = '.';
+    buf[6] = (s % 10) + '0';
+    buf[7] = '\0';
+    OLED_ShowString(1, 11, buf); // 第一行第11列开始显示
+}
+
+/**
   * @brief  OLED初始化
   * @param  无
   * @retval 无

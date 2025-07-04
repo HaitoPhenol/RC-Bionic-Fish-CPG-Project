@@ -21,7 +21,7 @@ void initCPGState(CPGState *state) {
     for (int i = 0; i < 3; i++) {
         state->x[i] = 0.1;
         state->y[i] = 0.1;
-        state->omega[i] = 1.5 * M_PI;
+        state->omega[i] = 2.5 * M_PI; // 增大频率，摆动更快
         state->amplitude[i] = (i == 0) ? 3.0 : (i == 1) ? 3.5 : 4.0;
         state->bias[i] = 0.0;
     }
@@ -112,8 +112,8 @@ void cpg_ode(CPGState *state, double *dx, double *dy) {
         if (!stop_flag) stop_flag = 1;
         // 平滑收敛到0（伸直），而不是直接置零
         for (int i = 0; i < 3; i++) {
-            dx[i] = -state->x[i] * 2.0; // 指数收敛
-            dy[i] = -state->y[i] * 2.0;
+            dx[i] = -state->x[i] * 6.0; // 指数收敛
+            dy[i] = -state->y[i] * 6.0; // <-这个数可以修改，数值越大复位速度越快
         }
         return;
     } else {
@@ -215,4 +215,16 @@ double map_to_servo(double y_value) {
     double angle_raw = y_clamped * 5;
     // 3. 偏移到80~120（中间值100）
     return 100 + angle_raw;
+}
+
+/**
+ * @brief 动态设置CPG振荡器频率
+ * @param state [输入/输出] 指向CPGState结构体的指针
+ * @param freq [输入] 新的频率（单位：Hz）
+ * @details 所有振荡器频率统一设置为 freq
+ */
+void set_cpg_frequency(CPGState *state, double freq) {
+    for (int i = 0; i < 3; i++) {
+        state->omega[i] = 1.0 * M_PI * freq; // freq为Hz
+    }
 }
