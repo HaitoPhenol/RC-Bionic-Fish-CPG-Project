@@ -10,57 +10,49 @@
 #include <stdio.h>         // 标准输入输出库，主要用于 sprintf 等格式化输出
 // #include <stdlib.h>     // 标准库函数，如 malloc、free、rand 等（当前未使用）
 
-// 主程序
-/**
- * @brief 主程序入口
- * @return int 通常返回0（但在嵌入式系统中不会返回）。
- * @details
- * 1. 初始化所有硬件外设（PWM、OLED、LED、按键、舵机等）。
- * 2. 初始化CPG状态结构体。
- * 3. 进入主循环：
- *    - 按固定步长dt调用cpg_update推进CPG状态。
- *    - 读取CPG输出，映射为舵机角度，控制3个舵机。
- *    - 根据当前时间段显示不同的运动模式（如直游、转弯、倒游等）及当前时间。
- *    - 实时显示每个舵机的角度和偏置值。
- *    - 持续运行，不会退出。
- */
+uint8_t KeyNum = 0;          // 定义用于接收按键码的变量
+
 int main() {
     // 初始化硬件
     PWM_Init();
     OLED_Init();
-    LED_Init();
     Key_Init();
     Servo_Init();
 
 	CPGState state;
     initCPGState(&state);
     double dt = 0.01; // 时间步长
-
+    // 初始状态g_motion_mode=5，鱼尾伸直
     while (1) {
+        KeyNum = Key_GetNum(); // 获取按键键码
+        // 按钮控制运动状态
+        // 1 - 按键1（PB1） 右转动作
+        // 2 - 按键2（PB10） 前进动作
+        // 3 - 按键3（PB11） 左转动作
+        // 4 - 按键4（PB0） 后退动作
+        // 5 - 按键5（PB12） 停止并回到初始位置
+        if (KeyNum == 1) {
+			OLED_ShowString(1, 1, "Right  ");
+        } else if (KeyNum == 2) {
+            OLED_ShowString(1, 1, "Forward");
+        } else if (KeyNum == 3) {
+            OLED_ShowString(1, 1, "Left   ");
+        } else if (KeyNum == 4) {
+            OLED_ShowString(1, 1, "Back   "); // 倒游
+        } else if (KeyNum == 5) {
+            OLED_ShowString(1, 1, "Reset  ");
+        }  
+      
+        // 更新舵机角度数据
         cpg_update(&state, dt);
         double servo_angles[3];
         for (int i = 0; i < 3; i++) {
             servo_angles[i] = map_to_servo(state.y[i]);
         }
 
-        if (state.t <= 10) {
-            OLED_ShowString(1, 1, "Forward");
-        } else if (state.t <= 20) {
-            OLED_ShowString(1, 1, "Turn   ");
-        } else if (state.t <= 30) {
-            OLED_ShowString(1, 1, "Forward");
-        } else if (state.t  <= 40) {
-            OLED_ShowString(1, 1, "Back   "); // 倒游
-        } else {
-            OLED_ShowString(1, 1, "Reset  "); // 复位
-        }
-        OLED_ShowString(1, 9, "t:");
-        OLED_ShowNum(1, 11, (int)state.t, 3);
-        
-
-        // 显示舵机角度（取整显示）
+        // 显示舵机角度（取整显示），并设置舵机角度
         double bias[3];
-        get_bias_values(state.t, bias, &state);
+        get_bias_values(KeyNum, bias, &state); // bias由g_motion_mode决定
 
         for (int i = 2; i < 5; i++) {
             char servo_label[5];
@@ -69,7 +61,7 @@ int main() {
             OLED_ShowNum   (i, 4, (int)servo_angles[i - 2], 3);
             OLED_ShowString(i, 8, "b:");
             OLED_ShowNum   (i, 10, (int)bias[i - 2], 1);
-            Servo_SetAngle(i - 1, servo_angles[i - 2]); // 新增：分别设置3个舵机
+            Servo_SetAngle(i - 1, servo_angles[i - 2]); //分别设置3个舵机
         }
     }
 }

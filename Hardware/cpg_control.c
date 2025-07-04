@@ -8,7 +8,7 @@ k为Hopf振荡器的收敛因子; 耦合项p(t)与q(t);
 
 //static：限定变量只在本文件（.c 文件）内可见，外部无法访问，防止命名冲突。
 //const：常量，初始化后不能修改。
-static const double M_PI = 3.14159265358979323846;
+double M_PI = 3.14159265358979323846;
 
 /**
  * @brief 初始化CPG状态结构体
@@ -51,30 +51,43 @@ void set_phase_direction(CPGState *state, int reverse) {
     }
 }
 
+// 新增：全局变量，记录当前动作模式（1~5），初始为5（停止/伸直）
+uint8_t g_motion_mode = 5;
+
 /**
  * @brief 获取不同时间段的偏置量，并切换相位方向
- * @param t [输入] 当前时间（单位：秒），用于判断当前运动阶段。
+ * @param t [废弃] 当前时间（单位：秒），已不用
  * @param bias [输出] 指向长度为3的double数组，函数将填充各振荡器的偏置量。
  * @param state [输入/输出] 指向CPGState结构体的指针，函数可能会调用set_phase_direction修改其相位。
- * @details 根据时间t自动切换不同的运动模式（如直游、转弯、倒游等），并设置对应的偏置和相位方向。
- *          该函数通常在每次CPG状态更新时调用。
+ * @details 根据g_motion_mode切换不同的运动模式（如直游、转弯、倒游等），并设置对应的偏置和相位方向。
  */
-void get_bias_values(double t, double *bias, CPGState *state) {
-    if (t <= 10) {
-        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 直游（无偏置）
-        set_phase_direction(state, 0); // 正向
-    } else if (t <= 20) {
-        bias[0] = 3.0; bias[1] = 3.0; bias[2] = 3.0; // 转弯（加3单位偏置）
-        set_phase_direction(state, 0); // 正向
-    } else if (t <= 30) {
-        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 直游
-        set_phase_direction(state, 0); // 正向
-    } else if (t <= 40) {
-        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 倒游
-        set_phase_direction(state, 1); // 反向
-    } else {
-        bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0; // 复位
-        set_phase_direction(state, 0); // 正向
+void get_bias_values(uint8_t KeyNum, double *bias, CPGState *state) {
+    // 只有检测到有效动作按键时才切换模式
+    if (KeyNum >= 1 && KeyNum <= 5) {
+        g_motion_mode = KeyNum;
+    }
+    switch (g_motion_mode) {
+        case 1: // 右转
+            bias[0] = 3.0; bias[1] = 3.0; bias[2] = 3.0;
+            set_phase_direction(state, 0);
+            break;
+        case 2: // 前进
+            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
+            set_phase_direction(state, 0);
+            break;
+        case 3: // 左转
+            bias[0] = -3.0; bias[1] = -3.0; bias[2] = -3.0;
+            set_phase_direction(state, 0);
+            break;
+        case 4: // 后退
+            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
+            set_phase_direction(state, 1);
+            break;
+        case 5: // 停止/伸直
+        default:
+            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
+            set_phase_direction(state, 0);
+            break;
     }
 }
 
@@ -88,7 +101,31 @@ void get_bias_values(double t, double *bias, CPGState *state) {
  */
 void cpg_ode(CPGState *state, double *dx, double *dy) {
     double bias[3];
-    get_bias_values(state->t, bias, state);
+    extern uint8_t KeyNum;
+    get_bias_values(KeyNum, bias, state);
+
+    // 停止/伸直模式下平滑收敛到y=0
+    static uint8_t stop_flag = 0;
+    extern uint8_t g_motion_mode;
+    if (g_motion_mode == 5) {
+        // 首次进入停止模式，置标志
+        if (!stop_flag) stop_flag = 1;
+        // 平滑收敛到0（伸直），而不是直接置零
+        for (int i = 0; i < 3; i++) {
+            dx[i] = -state->x[i] * 2.0; // 指数收敛
+            dy[i] = -state->y[i] * 2.0;
+        }
+        return;
+    } else {
+        // 从停止模式切换到运动模式，重新激活振荡器
+        if (stop_flag) {
+            for (int i = 0; i < 3; i++) {
+                state->x[i] = 0.1;
+                state->y[i] = 0.1;
+            }
+            stop_flag = 0;
+        }
+    }
 
     double phase[2];
     phase[0] = state->phase[0];
@@ -102,15 +139,12 @@ void cpg_ode(CPGState *state, double *dx, double *dy) {
         double b = bias[i];
         double k = state->k;
 
-        // Hopf振荡器的非线性项
         double nonlinear = A * A - x * x - (y - b) * (y - b);
 
         double p = 0.0;
         double q = 0.0;
 
-        // 计算耦合项
         if (i == 0) {
-            // 第一个振荡器只与下一个耦合
             if (i + 1 < 3) {
                 double h = state->coupling[i][1];
                 double phi = phase[0];
@@ -120,7 +154,6 @@ void cpg_ode(CPGState *state, double *dx, double *dy) {
                 q = h * (x_next * sin(phi) + (y_next - b_next) * cos(phi));
             }
         } else if (i == 2) {
-            // 最后一个振荡器只与前一个耦合
             if (i - 1 >= 0) {
                 double h = state->coupling[i][0];
                 double phi = phase[1];
@@ -130,7 +163,6 @@ void cpg_ode(CPGState *state, double *dx, double *dy) {
                 p = h * (x_prev * cos(phi) + (y_prev - b_prev) * sin(phi));
             }
         } else {
-            // 中间振荡器与前后都耦合
             double h_prev = state->coupling[i][0];
             double phi_prev = phase[0];
             double x_prev = state->x[i - 1];
@@ -146,7 +178,6 @@ void cpg_ode(CPGState *state, double *dx, double *dy) {
             q = h_next * (x_next * sin(phi_next) + (y_next - b_next) * cos(phi_next));
         }
 
-        // Hopf振荡器微分方程
         dx[i] = -omega * (y - b) + k * x * nonlinear + p;
         dy[i] = omega * x + k * (y - b) * nonlinear + q;
     }

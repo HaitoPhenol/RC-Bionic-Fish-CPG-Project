@@ -1,0 +1,64 @@
+# 忽略编译生成的对象文件夹
+# IDE 配置
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# 编译生成文件夹
+DebugConfig/
+Listings/
+Objects/
+Debug/
+Release/
+build/
+out/
+
+# 编译生成的文件
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.d
+*.dep
+*.axf
+
+# 日志和临时文件
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 其他常见忽略项
+*.user
+*.aps
+*.sdf
+*.suo
+*.ncb
+*.db
+*.opendb
+*.pyc
+*.pyo
+*.class
+
+# Keil/IAR/STM32CubeMX等生成的工程文件夹
+# *.uvoptx
+# *.uvprojx
+*.uvguix.*
+*.uvopt
+*.uvproj
+*.dep
+*.plg
+*.bak
+*.uvgui.*
+
+# STM32CubeMX生成的
+*.ioc
