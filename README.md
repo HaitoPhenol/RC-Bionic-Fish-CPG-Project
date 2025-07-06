@@ -1,3 +1,5 @@
 # 仿生鱼控制程序
-### STM32F103C8T6 Keilv5
-菜菜……嘿嘿…………
+### Keil_v5 + VSCode
+- STM32F103C8T6
+- 遥控器 天地飞ET16S
+- CPG（Central Pattern Generator中央模式发生器）
