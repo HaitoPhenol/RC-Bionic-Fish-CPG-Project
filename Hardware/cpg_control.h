@@ -34,14 +34,21 @@ void initCPGState(CPGState *state);
 void set_phase_direction(CPGState *state, int reverse);
 
 /**
- * @brief 获取不同按钮对应的偏置量，并切换相位方向
- * @param KeyNum [输入] 当前按键值，决定当前运动阶段。
- * @param bias [输出] 指向长度为3的double数组，函数将填充各振荡器的偏置量。
- * @param state [输入/输出] 指向CPGState结构体的指针，函数可能会调用set_phase_direction修改其相位。
- * @details 根据按键KeyNum自动切换不同的运动模式（如直游、转弯、倒游等），并设置对应的偏置和相位方向。
- *          该函数通常在每次CPG状态更新时调用。
+ * @brief 动态设置CPG振荡器频率
+ * @param state [输入/输出] 指向CPGState结构体的指针
+ * @param freq [输入] 新的频率（单位：Hz）
+ *              使用SBUS通道2的数据，映射范围 (-5.5, 5.5)
+ * @details 所有振荡器频率统一设置为 freq
  */
-void get_bias_values(uint8_t KeyNum, double *bias, CPGState *state);
+void set_cpg_frequency(CPGState *state, double freq);
+
+/**
+ * @brief 获取不同时间段的偏置量，并切换相位方向
+ * @param state [输入/输出] 指向CPGState结构体的指针
+ * @param bias [输入] 单个偏置值（不再是指针）
+ *              使用SBUS通道3的数据，映射范围 (-3, 3)
+ */
+void set_cpg_bias(CPGState *state, double bias);
 
 /**
  * @brief 计算CPG微分方程（Hopf振荡器）
@@ -68,16 +75,5 @@ void cpg_update(CPGState *state, double dt);
  * @details 先将y_value限制在[-9,9]，再线性放大并偏移到舵机角度区间，便于直接用于舵机控制。
  */
 double map_to_servo(double y_value);
-
-/**
- * @brief 动态设置CPG振荡器频率
- * @param state [输入/输出] 指向CPGState结构体的指针
- * @param freq [输入] 新的频率（单位：Hz）
- * @details 所有振荡器频率统一设置为 freq
- */
-void set_cpg_frequency(CPGState *state, double freq);
-
-// 新增：全局动作模式变量声明
-extern uint8_t g_motion_mode;
 
 #endif

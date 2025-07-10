@@ -285,6 +285,57 @@ void OLED_ShowSpeed(float speed)
 }
 
 /**
+  * @brief  OLED显示浮点数（带符号，支持小数）
+  * @param  Line 起始行位置，范围：1~4
+  * @param  Column 起始列位置，范围：1~16
+  * @param  Number 要显示的浮点数
+  * @param  IntegerLength 整数部分长度，范围：1~3
+  * @param  DecimalLength 小数部分长度，范围：1~3
+  * @retval 无
+  */
+void OLED_ShowFloat(uint8_t Line, uint8_t Column, float Number, uint8_t IntegerLength, uint8_t DecimalLength)
+{
+    int32_t IntegerPart, DecimalPart;
+    uint8_t i;
+    char buf[10];
+    uint8_t index = 0;
+
+    // 处理符号位
+    if (Number < 0)
+    {
+        buf[index++] = '-';
+        Number = -Number;
+    }
+    else
+    {
+        buf[index++] = ' ';
+    }
+
+    // 提取整数部分和小数部分
+    IntegerPart = (int32_t)Number;
+    DecimalPart = (int32_t)((Number - IntegerPart) * OLED_Pow(10, DecimalLength) + 0.5);
+
+    // 显示整数部分
+    for (i = 0; i < IntegerLength; i++)
+    {
+        buf[index++] = IntegerPart / OLED_Pow(10, IntegerLength - i - 1) % 10 + '0';
+    }
+
+    // 显示小数点
+    buf[index++] = '.';
+
+    // 显示小数部分
+    for (i = 0; i < DecimalLength; i++)
+    {
+        buf[index++] = DecimalPart / OLED_Pow(10, DecimalLength - i - 1) % 10 + '0';
+    }
+    buf[index] = '\0';
+
+    // 显示字符串
+    OLED_ShowString(Line, Column, buf);
+}
+
+/**
   * @brief  OLED初始化
   * @param  无
   * @retval 无

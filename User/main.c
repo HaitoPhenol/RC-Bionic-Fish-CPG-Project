@@ -8,74 +8,59 @@
 #include "PWM.h"           // PWM（脉宽调制）控制相关函数
 #include <math.h>          // 数学库函数，如 sin、cos、pow 等
 #include <stdio.h>         // 标准输入输出库，主要用于 sprintf 等格式化输出
-// #include <stdlib.h>     // 标准库函数，如 malloc、free、rand 等（当前未使用）
+#include "SBUS.h"
 
-uint8_t KeyNum = 0;          // 定义用于接收按键码的变量
-double cpg_freq = 2.5;       // 当前CPG频率（Hz），初始值2.5
+extern uint8_t uart_sbus_ok;//SBUS数据就绪(单次接收完毕) 全局变量
 
 int main() {
+    uint16_t chbuf[6]={0};//6个通道数据存储数组
+
     // 初始化硬件
     PWM_Init();
     OLED_Init();
-    Key_Init();
     Servo_Init();
+    uart_init(100000);
 
 	CPGState state;
     initCPGState(&state);
     double dt = 0.01; // 时间步长
-    // 初始状态g_motion_mode=5，鱼尾伸直
     while (1) {
-        KeyNum = Key_GetNum(); // 获取按键键码
-        // 处理加速/减速键
-        if (KeyNum == 6) { // B13加速
-            cpg_freq += 0.1;
-            if (cpg_freq > 5.0) cpg_freq = 5.0;
-        } else if (KeyNum == 7) { // B14减速
-            cpg_freq -= 0.1;
-            if (cpg_freq < 1.0) cpg_freq = 1.0;
-        }
-        set_cpg_frequency(&state, cpg_freq); // 每次循环都设置频率
+        if(uart_sbus_ok){   // 数据就绪可以读取
+			uart_sbus_ok=0;
+			Save_6CH(chbuf);    // 使用Save_6CH函数向chbuf写入通道数据
+			rxbuf_clear();      // 清空串口缓冲区
 
-        // 按钮控制运动状态
-        // 1 - 按键1（PB1）     右转动作
-        // 2 - 按键2（PB10）    前进动作
-        // 3 - 按键3（PB11）    左转动作
-        // 4 - 按键4（PB0）     后退动作
-        // 5 - 按键5（PB12）    停止并回到初始位置
-        if (KeyNum == 1) {
-			OLED_ShowString(1, 1, "Right  "); // 1
-        } else if (KeyNum == 2) {
-            OLED_ShowString(1, 1, "Forward"); // 2
-        } else if (KeyNum == 3) {
-            OLED_ShowString(1, 1, "Left   "); // 3
-        } else if (KeyNum == 4) {
-            OLED_ShowString(1, 1, "Back   "); // 4 倒游
-        } else if (KeyNum == 5) {
-            OLED_ShowString(1, 1, "Reset  "); // 5 停止并回到初始位置
-        }
+		
+            // 更新CPG状态
+            set_cpg_frequency(&state, chbuf[2]); // 每次循环都设置频率
+            set_cpg_bias(&state, chbuf[3]);
+            // CPG更新舵机角度数据
+            cpg_update(&state, dt);
 
-        // 更新舵机角度数据
-        cpg_update(&state, dt);
-        double servo_angles[3];
-        for (int i = 0; i < 3; i++) {
-            servo_angles[i] = map_to_servo(state.y[i]);
-        }
+            // 获取舵机角度数据
+            double servo_angles[3];
+            for (int i = 0; i < 3; i++) {
+                servo_angles[i] = map_to_servo(state.y[i]);
+            }
 
-        // 显示当前速度（频率），在第一行右侧
-        char freq_str[10];
-        sprintf(freq_str, "V:%.1f", cpg_freq);
-        OLED_ShowString(1, 12, freq_str);
-        // 显示舵机角度（取整显示），并设置舵机角度
-        double bias[3];
-        get_bias_values(KeyNum, bias, &state); // bias由g_motion_mode决定
-        for (int i = 2; i < 5; i++) {
-            char servo_label[5];
-            sprintf(servo_label, "S%d:", i - 1);
-            OLED_ShowString(i, 1, servo_label);
-            OLED_ShowNum   (i, 4, (int)servo_angles[i - 2], 3);
-            OLED_ShowString(i, 8, "b:");
-            OLED_ShowNum   (i, 10, (int)bias[i - 2], 1);
-            Servo_SetAngle(i - 1, servo_angles[i - 2]); //分别设置3个舵机
+            // 显示舵机角度（取整显示），并设置舵机角度
+            // double bias[3];
+            // get_bias_values(KeyNum, bias, &state); // bias由g_motion_mode决定
+            for (int i = 2; i < 5; i++) {
+                // 舵机角度数据
+                char servo_label[5];
+                sprintf(servo_label, "S%d:", i - 1);
+                OLED_ShowString(i, 1, servo_label);
+                OLED_ShowNum   (i, 4, (int)servo_angles[i - 2], 3);
+                Servo_SetAngle(i - 1, servo_angles[i - 2]); //分别设置3个舵机   
+            }
+                // 速度、偏置、侧鳍 数据
+                OLED_ShowString(2, 8, "a:");
+                OLED_ShowFloat(2, 10, state.omega[0], 3, 1);  // 显示3位整数1位小数
+                OLED_ShowString(3, 8, "b:");
+                OLED_ShowFloat(3, 10, state.bias[0], 3, 1);   // 显示3位整数1位小数
+                OLED_ShowString(4, 8, "c:");
+                OLED_ShowFloat(4, 10, (float)chbuf[1], 3, 1); // 转换为浮点数显示
         }
     }
 }

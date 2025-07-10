@@ -730,6 +730,16 @@
               <FileType>5</FileType>
               <FilePath>.\Hardware\cpg_control.h</FilePath>
             </File>
+            <File>
+              <FileName>SBUS.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\SBUS.c</FilePath>
+            </File>
+            <File>
+              <FileName>SBUS.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\SBUS.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -36,6 +36,32 @@ void initCPGState(CPGState *state) {
 }
 
 /**
+ * @brief 将SBUS通道值映射到目标范围
+ * @param sbus_value SBUS原始值（范围353-1695）
+ * @param target_min 目标范围最小值
+ * @param target_max 目标范围最大值
+ * @return double 映射后的目标值
+ * @details 中间值1024将映射到目标范围的中点
+ */
+// 修改参数类型为int16_t以支持负值传递
+double map_to_range(double target_min, double target_max, double sbus_value) {
+    // SBUS原始范围参数
+    const int16_t SBUS_MIN = 353;
+    const int16_t SBUS_MAX = 1695;
+    // const int16_t SBUS_MID = 1024;
+    
+    // 限制输入值在有效范围内
+    if (sbus_value < SBUS_MIN) sbus_value = SBUS_MIN;
+    if (sbus_value > SBUS_MAX) sbus_value = SBUS_MAX;
+    
+    return (sbus_value - SBUS_MIN) * (target_max - target_min) / (SBUS_MAX - SBUS_MIN) + target_min;
+    // // 计算归一化比例（0-1）
+    // double normalized = (double)(sbus_value - SBUS_MIN) / (SBUS_MAX - SBUS_MIN);
+    // // 映射到目标范围（支持正负范围）
+    // return target_min + normalized * (target_max - target_min);
+}
+
+/**
  * @brief 设置CPG相位方向（正向或反向）
  * @param state [输入/输出] 指向CPGState结构体的指针，函数将修改其phase成员。
  * @param reverse [输入] 整型，0表示正向（phase为正），1表示反向（phase为负）。
@@ -51,43 +77,35 @@ void set_phase_direction(CPGState *state, int reverse) {
     }
 }
 
-// 新增：全局变量，记录当前动作模式（1~5），初始为5（停止/伸直）
-uint8_t g_motion_mode = 5;
+/**
+ * @brief 动态设置CPG振荡器频率
+ * @param state [输入/输出] 指向CPGState结构体的指针
+ * @param freq [输入] 新的频率（单位：Hz）
+ *              使用SBUS通道2的数据，映射范围 (-5.5, 5.5)
+ * @details 所有振荡器频率统一设置为 freq
+ */
+void set_cpg_frequency(CPGState *state, double freq) {
+    for (int i = 0; i < 3; i++) {
+        state->omega[i] = M_PI * fabs(map_to_range(-5.5, 5.5, freq)); // freq为Hz
+    }
+    // req为负时调转相位为后退状态
+    if (freq < 0) {
+        set_phase_direction(state, 1); // 假设存在后退相位常量
+    } else {
+        set_phase_direction(state, 0);  // 假设存在前进相位常量
+    }
+}
 
 /**
  * @brief 获取不同时间段的偏置量，并切换相位方向
- * @param t [废弃] 当前时间（单位：秒），已不用
- * @param bias [输出] 指向长度为3的double数组，函数将填充各振荡器的偏置量。
  * @param state [输入/输出] 指向CPGState结构体的指针，函数可能会调用set_phase_direction修改其相位。
+ * @param bias [输出] 指向长度为3的double数组，函数将填充各振荡器的偏置量。
+ *              使用SBUS通道3的数据，映射范围 (-3, 3)
  * @details 根据g_motion_mode切换不同的运动模式（如直游、转弯、倒游等），并设置对应的偏置和相位方向。
  */
-void get_bias_values(uint8_t KeyNum, double *bias, CPGState *state) {
-    // 只有检测到有效动作按键时才切换模式
-    if (KeyNum >= 1 && KeyNum <= 5) {
-        g_motion_mode = KeyNum;
-    }
-    switch (g_motion_mode) {
-        case 1: // 右转
-            bias[0] = 3.0; bias[1] = 3.0; bias[2] = 3.0;
-            set_phase_direction(state, 0);
-            break;
-        case 2: // 前进
-            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
-            set_phase_direction(state, 0);
-            break;
-        case 3: // 左转
-            bias[0] = -3.0; bias[1] = -3.0; bias[2] = -3.0;
-            set_phase_direction(state, 0);
-            break;
-        case 4: // 后退
-            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
-            set_phase_direction(state, 1);
-            break;
-        case 5: // 停止/伸直
-        default:
-            bias[0] = 0.0; bias[1] = 0.0; bias[2] = 0.0;
-            set_phase_direction(state, 0);
-            break;
+void set_cpg_bias(CPGState *state, double bias) {
+    for (int i = 0; i < 3; i++) {
+    state->bias[i] = map_to_range(-3.0, 3.0, bias);
     }
 }
 
@@ -100,33 +118,11 @@ void get_bias_values(uint8_t KeyNum, double *bias, CPGState *state) {
  *          通常不直接调用，由cpg_update间接调用。
  */
 void cpg_ode(CPGState *state, double *dx, double *dy) {
+    // 准备一些必要的局部变量
     double bias[3];
-    extern uint8_t KeyNum;
-    get_bias_values(KeyNum, bias, state);
-
-    // 停止/伸直模式下平滑收敛到y=0
-    static uint8_t stop_flag = 0;
-    extern uint8_t g_motion_mode;
-    if (g_motion_mode == 5) {
-        // 首次进入停止模式，置标志
-        if (!stop_flag) stop_flag = 1;
-        // 平滑收敛到0（伸直），而不是直接置零
-        for (int i = 0; i < 3; i++) {
-            dx[i] = -state->x[i] * 6.0; // 指数收敛
-            dy[i] = -state->y[i] * 6.0; // <-这个数可以修改，数值越大复位速度越快
-        }
-        return;
-    } else {
-        // 从停止模式切换到运动模式，重新激活振荡器
-        if (stop_flag) {
-            for (int i = 0; i < 3; i++) {
-                state->x[i] = 0.1;
-                state->y[i] = 0.1;
-            }
-            stop_flag = 0;
-        }
-    }
-
+    bias[0] = state->bias[0];
+    bias[1] = state->bias[1];
+    bias[2] = state->bias[2];
     double phase[2];
     phase[0] = state->phase[0];
     phase[1] = state->phase[1];
@@ -217,14 +213,4 @@ double map_to_servo(double y_value) {
     return 100 + angle_raw;
 }
 
-/**
- * @brief 动态设置CPG振荡器频率
- * @param state [输入/输出] 指向CPGState结构体的指针
- * @param freq [输入] 新的频率（单位：Hz）
- * @details 所有振荡器频率统一设置为 freq
- */
-void set_cpg_frequency(CPGState *state, double freq) {
-    for (int i = 0; i < 3; i++) {
-        state->omega[i] = 1.0 * M_PI * freq; // freq为Hz
-    }
-}
+
