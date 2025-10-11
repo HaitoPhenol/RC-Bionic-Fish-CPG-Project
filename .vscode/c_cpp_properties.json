@@ -7,9 +7,7 @@
                 "d:\\STM32Projects\\_Fish_\\Biomimetic-Fish-Project\\Library",
                 "d:\\STM32Projects\\_Fish_\\Biomimetic-Fish-Project\\User",
                 "d:\\STM32Projects\\_Fish_\\Biomimetic-Fish-Project\\System",
-                "d:\\STM32Projects\\_Fish_\\Biomimetic-Fish-Project\\Hardware",
-                "C:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include",
-                "C:\\Program Files\\Keil_v5\\ARM\\ARMCC\\include\\rw"
+                "d:\\STM32Projects\\_Fish_\\Biomimetic-Fish-Project\\Hardware"
             ],
             "defines": [
                 "USE_STDPERIPH_DRIVER",

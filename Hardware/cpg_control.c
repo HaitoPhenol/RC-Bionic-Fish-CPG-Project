@@ -36,14 +36,13 @@ void initCPGState(CPGState *state) {
 }
 
 /**
- * @brief 将SBUS通道值映射到目标范围
+ * @brief 将SBUS通道值映射到目标范围，支持负值传递
  * @param sbus_value SBUS原始值（范围353-1695）
  * @param target_min 目标范围最小值
  * @param target_max 目标范围最大值
  * @return double 映射后的目标值
  * @details 中间值1024将映射到目标范围的中点
  */
-// 修改参数类型为int16_t以支持负值传递
 double map_to_range(double target_min, double target_max, double sbus_value) {
     // SBUS原始范围参数
     const int16_t SBUS_MIN = 353;
