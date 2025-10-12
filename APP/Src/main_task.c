@@ -1,8 +1,6 @@
 #include "main_task.h"
 #include "servo.h"
 
-
-
 uint16_t channel_buf[6]={0}; // 6个通道数据存储数组
 CPGState state;
 double dt = 0.01; // 时间步长
@@ -33,7 +31,6 @@ void mainTask(void)
         Save_6CH(channel_buf);      // 使用Save_6CH函数向channel_buf写入通道数据
         rxbuf_clear();              // 清空串口缓冲区
 
-    
         // 更新CPG状态
         set_cpg_frequency(&state, channel_buf[2]);    // 每次循环都设置频率
         set_cpg_bias(&state, channel_buf[3]);

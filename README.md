@@ -2,7 +2,8 @@
 STM32F103C8T6 SBUS RC Bionic Fish CPG Control Program
 
 ### 开发工具IDE
-- Keil_v5 + VSCode
+- CubeMX + VSCode
+- HAL库
 
 ### 硬件设备
 
