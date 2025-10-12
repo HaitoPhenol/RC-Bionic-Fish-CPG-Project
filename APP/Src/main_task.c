@@ -62,7 +62,7 @@ void mainTask(void)
         OLED_PrintASCIIString(8, 3, "c:", &afont8x6, OLED_COLOR_NORMAL);
         OLED_PrintFloat(10, 3, map_to_range(55, 145, channel_buf[1]), 1, &afont8x6, OLED_COLOR_NORMAL);           // 转换为浮点数显示
     } else {
-        // OLED_PrintASCIIString(1, 1, "SBUS did not ready..", &afont8x6, OLED_COLOR_NORMAL);
+        
     }
     OLED_ShowFrame(); // 显示帧
 }

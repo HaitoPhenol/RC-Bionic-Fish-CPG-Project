@@ -1,9 +1,10 @@
+# 忽略编译生成的对象文件夹
 build
 mx.scratch
-!.settings
-# 忽略编译生成的对象文件夹
+# .settings
+
 # IDE 配置
-.vscode/
+# .vscode/
 .idea/
 *.sublime-workspace
 *.sublime-project
@@ -53,8 +54,8 @@ Thumbs.db
 *.class
 
 # Keil/IAR/STM32CubeMX等生成的工程文件夹
-# *.uvoptx
-# *.uvprojx
+*.uvoptx
+*.uvprojx
 *.uvguix.*
 *.uvopt
 *.uvproj
@@ -64,4 +65,4 @@ Thumbs.db
 *.uvgui.*
 
 # STM32CubeMX生成的
-*.ioc
+# *.ioc
