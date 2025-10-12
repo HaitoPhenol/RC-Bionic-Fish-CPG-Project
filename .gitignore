@@ -1,3 +1,6 @@
+build
+mx.scratch
+!.settings
 # 忽略编译生成的对象文件夹
 # IDE 配置
 .vscode/
