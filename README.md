@@ -1,6 +1,8 @@
 # STM32遥控CPG仿生鱼 控制程序
 STM32F103C8T6 SBUS RC Bionic Fish CPG Control Program
 
+## 项目已迁移到新仓库，[点此打开](https://github.com/OriShepher-Labs/OriShepher)
+
 ### 开发工具IDE
 - STM32CubeMX + VSCode
 - HAL库
